@@ -1,0 +1,21 @@
+Car DB server
+
+
+Basic Python HTTP server with some xml parsing into a hash of hashes
+and serve Javascript requests from that to update the web ui.
+The script gets the job done, is rather hacky, neither pretty, nor am
+I fluent in Javascript...
+
+Access would be via port 8000 on the layout computer.
+
+Usage:
+- put SVL post-printing XML database file "SVL_Base_sess_post.xml"
+into same directory as server (or symlink to the actual file)
+- ./server.py  , logs get printed to stdout
+- go to http://10.0.0.25:8000
+- On the web page, touch type any part of any car number on the
+layout. The table underneath the number pad gets populated with
+matching cars.
+You see where the car is, where it's supposed go, and on which train.
+
+Bernhard
