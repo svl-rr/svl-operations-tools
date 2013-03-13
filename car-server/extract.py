@@ -4,10 +4,12 @@
 
 from xml.dom.minidom import parseString, Node
 
-def importXML():
+import re
+
+def importXML(filename='SVL_Base_sess_post.xml'):
  
   #open the xml file for reading:
-  file = open('SVL_Base_sess_post.xml','r')
+  file = open(filename,'r')
   #convert to string:
   data = file.read()
   #close file because we dont need it anymore:
@@ -135,6 +137,68 @@ def importXML():
   cars['version'] = version
 
   return cars
+
+def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
+
+  #open the ycra file for reading:
+  file = open(filename,'r')
+  #convert to string:
+  data = file.read()
+  #close file because we dont need it anymore:
+  file.close()
+
+  # I hate parsing data out of html. especially if the html is invalid xml.
+
+  # Basic checks:
+  # - we actually have a Nowheres YCRA report
+  # - session matches session in cars
+  m = re.search('<title>Nowheres Yard Yardmaster Car Report \(All\)</title>', data)
+  if not m:
+    print 'This is not a Nowheres YCRA report'
+    return False
+
+  m = re.search('Report for session: (\d+)', data)
+  if not m:
+    print 'No session information found'
+    return False
+  session = m.group(1)
+  if session != cars['version']['session']:
+    print 'Session mismatch: >%s< from YCRA, >%s< from XML' % (session, cars['version']['session'])
+    return False
+
+  # parse out all occurences of future train assignments
+  # pattern:
+  # <tr  BGCOLOR=""><td  align="center"></td><td  align="center">Nowheres&nbsp;Yard</td><td  align="center">ATSF&nbsp;135506</td><td  align="center">XM4</td><td  align="center">Empty</td><td  align="center">Jasper&nbsp;Jct.&nbsp;|&nbsp;Jasper&nbsp;Track&nbsp;#5&nbsp;-&nbsp;Old&nbsp;Junction&nbsp;City&nbsp;(5,6)</td><td  align="center">378|57</td><td  align="center"><input type="checkbox" name="TASK_COMPLETE" value="OFF" /></td></tr>
+  p = '<tr.*<td.*>Nowheres&nbsp;Yard</td><td.*>(.*)</td><td.*/td><td.*/td><td .*>(.*)</td><td.*>(\d+\|\d+)</td><td.*td></tr>'
+  cl = re.findall(p, data)
+  future_cars = {}
+  for c in cl:
+    # c[car number, final destination, future train]
+    car = c[0].replace('&nbsp;', ' ')
+    final_dest = c[1].replace('&nbsp;', ' ')
+    future_train = c[2]
+    future_cars[car] = (car, final_dest, future_train)
+  
+  found_cars = {}
+  # loop over known car numbers and find our cars
+  for carid in cars.keys():
+    if cars[carid]['car_number'] in future_cars:
+      found_cars[carid] = future_cars[cars[carid]['car_number']]
+      del future_cars[cars[carid]['car_number']]
+
+  if len(future_cars) != 0:
+    print 'Not all future cars were found in cars database'
+
+  for carID in found_cars.keys():
+    # plug those cars into the cars database
+    if 'Move' not in cars[carID]:
+      cars[carID]['Move'] = []
+    cars[carID]['Move'].append(
+        {'symbol': found_cars[carID][2], 'depTime' : '--:--:--',
+         'startBlock' : 'Nowheres', 'startLoc' : ['Nowheres', 'Nowheres Yard'],
+         'endBlock' : 'Nowheres', 'endLoc' : ['Nowheres', 'assign to ' + found_cars[carID][2]] }
+    )
+  return True 
 
 #cars = importXML()
 #for car in cars:

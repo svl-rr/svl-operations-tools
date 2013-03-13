@@ -5,6 +5,7 @@
 from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from os import curdir, sep
 import cgi
+import os
 import re
 
 import extract
@@ -25,7 +26,7 @@ TABLEFOOTER = '</table>'
 
 PAGE="""
 <html>
-<head><title>bla</title>
+<head><title>Car Lookup</title>
 <script language="javascript">
 function updateCarNumber(digit) {
   setCarNumber(document.getElementById('car_number').value + digit)
@@ -51,11 +52,13 @@ function makeHttpObject() {
 }
 function requestResults() {
   var car_number = document.getElementById('car_number').value
+  var switchlist_mode = document.getElementById('switchlist_mode').checked
+  var switchlist_id = document.getElementById('switchlist_id').value
   if (car_number == 'undefined') {
     car_number = ''
   }
   var request = makeHttpObject();
-  request.open("GET", "/resultseval?car_number=" + car_number, true);
+  request.open("GET", "/resultseval?car_number=" + car_number + "&slm=" + switchlist_mode + "&sid=" + switchlist_id, true);
   request.send(null);
   request.onreadystatechange = function() {
     if (request.readyState == 4) {
@@ -67,11 +70,38 @@ function requestResults() {
 function updateResults(response) {
   document.getElementById('results').innerHTML = response
 }
+function SLMSetId() {
+  var sid = 'fgjh'
+  document.getElementById('switchlist_id').value = sid
+  document.getElementById('switchlist_href').href = '/switchlist_print?sid=' + sid
+  requestResults()
+}
+function SLMAddCar(car) {
+  var switchlist_mode = document.getElementById('switchlist_mode').checked
+  if (switchlist_mode) {
+    var switchlist_id = document.getElementById('switchlist_id').value
+    var request = makeHttpObject();
+    request.open("GET", "/switchlist_add?car=" + car + "&sid=" + switchlist_id, true);
+    request.send(null);
+    request.onreadystatechange = function() {
+      if (request.readyState == 4) {
+        if (request.status == 200)
+          SLMUpdateCount(request.responseText);
+      }
+    };
+  }
+}
+function SLMUpdateCount(response) {
+  document.getElementById('switchlist_len').innerHTML = response + " cars"
+  setCarNumber('')
+}
+
 </script>
 </head>
 <body>
+<div align=right><a href="/upload.html">Upload</a></div>
 <form action="/results" method=post id="selector">
-<input type=hidden name="car_number" value="%(car_number)s" id='car_number' onchange="requestResults()">
+<input type=hidden name="car_number" value="%(car_number)s" id="car_number" onchange="requestResults()">
 <table width=900><tr>
 <td width=300 height=60 bgcolor=dddddd fgcolor=white align=center valign=middle onclick="updateCarNumber('1')">1</td>
 <td width=300 bgcolor=dddddd align=center valign=middle onclick="updateCarNumber('2')">2</td>
@@ -94,6 +124,12 @@ function updateResults(response) {
 %(table_row_header)s
 %(car_rows)s
 %(table_footer)s
+<br><br>
+<div align=right>
+SLM:&nbsp;<input type=checkbox name="switchlist_mode" id="switchlist_mode" onchange="SLMSetId()"><br>
+<input type=text name="switchlist_id" id="switchlist_id">
+<a href="/switchlist_print" target="slmp" id="switchlist_href"><div id="switchlist_len">0 cars</div></a>
+</div>
 </form>
 </body>
 </html>
@@ -109,6 +145,9 @@ filetypes = [
 
 # dict of dicts holding car by car routing information
 cars = {}
+
+# dict of switch list arrays
+switchlists = {}
 
 # format information about session as defined in cars
 def GetSessionInfo():
@@ -127,23 +166,25 @@ def GetSessionInfo():
 #the browser
 class svlHandler(BaseHTTPRequestHandler):
 
+  def sendEmptyTemplate(self):
+    self.send_response(200)
+    self.send_header('Content-type','text/html')
+    self.end_headers()
+    self.wfile.write(
+      PAGE % {
+        'car_number' : '',
+        'car_rows' : '',
+        'table_header' : TABLEHEADER,
+        'session' : GetSessionInfo(),
+        'table_row_header' : TABLEROWHEADER,
+        'table_footer' : TABLEFOOTER,
+      }
+  )
+
   #Handler for the GET requests
   def do_GET(self):
     if self.path=="/":
-      # just send the empty template 
-      self.send_response(200)
-      self.send_header('Content-type','text/html')
-      self.end_headers()
-      self.wfile.write(
-        PAGE % {
-          'car_number' : '',
-          'car_rows' : '',
-          'table_header' : TABLEHEADER,
-          'session' : GetSessionInfo(),
-          'table_row_header' : TABLEROWHEADER,
-          'table_footer' : TABLEFOOTER,
-        } 
-      )
+      self.sendEmptyTemplate()
       return
 
     if self.path.startswith('/resultseval'):
@@ -154,6 +195,25 @@ class svlHandler(BaseHTTPRequestHandler):
       print 'form',form
       self.wfile.write(self.HandleResultsEval(form))
       return
+
+    if self.path.startswith('/switchlist_add'):
+      # add selected car to switchlist
+      self.send_response(200)
+      self.end_headers()
+      form = cgi.parse_qs(self.path[self.path.index('?') + 1:])
+      print 'form',form
+      self.wfile.write(self.HandleSwitchListAdd(form))
+      return
+
+    if self.path.startswith('/switchlist_print'):
+      # print switch list
+      self.send_response(200)
+      self.end_headers()
+      form = cgi.parse_qs(self.path[self.path.index('?') + 1:])
+      print 'form',form
+      self.wfile.write(self.HandleSwitchListPrint(form))
+      return
+
 
     # otherwise try serving a static page
     try:
@@ -189,7 +249,7 @@ class svlHandler(BaseHTTPRequestHandler):
     self.end_headers()
     fields = {}
 
-    if self.path=='/upload':
+    if self.path=='/handle_files':
       # new svl data file coming in.
       fields = self.HandleUpload(form)
 
@@ -202,16 +262,84 @@ class svlHandler(BaseHTTPRequestHandler):
 
 
   # handle upload of xml SVL file 
+  # and Nowheres Yardmaster paperwork
   def HandleUpload(self, form):
-    print 'handling upload'
+
+    def SaveFile(formfile):
+      if formfile.filename:
+        fn1 = 'files/' + os.path.basename(formfile.filename)
+        fn = fn1
+        count = 0
+        while os.path.exists(fn):
+          fn = '%s-%d' % (fn1, count)
+          count += 1
+        f = open(fn, 'wb')
+        f.write(formfile.file.read())
+        f.close()
+        print 'uploaded %s' % fn
+        return fn
+      return None
+
+    xmlfile = form['xmlfile']
+    nowheresfile = form['nowheresfile']
+
+    xmlfilename = SaveFile(xmlfile)
+    nowheresfilename = SaveFile(nowheresfile)
+    if xmlfilename:
+      print 'XML upload success'
+      new_cars = extract.importXML(xmlfilename)
+      if (not nowheresfilename) or \
+         (nowheresfilename and extract.importYCRA(new_cars, nowheresfilename)):
+        try:
+          os.unlink('SVL_Base_sess_post.xml')
+          os.unlink('YCR-A-Nowheres Yard.html')
+        except:
+          pass
+        os.symlink(xmlfilename, 'SVL_Base_sess_post.xml')
+        print 'using new XML file'
+        if nowheresfilename:
+          os.symlink(nowheresfilename, 'YCR-A-Nowheres Yard.html')
+          print 'using new Nowheres YCRA'
+        cars.update(new_cars)
+    
+    return {
+          'car_number' : '',
+          'car_rows' : '',
+          'table_header' : TABLEHEADER,
+          'session' : GetSessionInfo(),
+          'table_row_header' : TABLEROWHEADER,
+          'table_footer' : TABLEFOOTER,
+        } 
+
+  # look up and return car destination and moves
+  def GetDstAndMove(self, car):
+    dst = [['','']]
+    move = []
+    if 'Move' in cars[car]:
+      # this car is going on a train today.
+      # move is array of dict with schedule info
+      move = cars[car]['Move']
+      # sort by departure time
+      move.sort(key=lambda m: m['depTime'])
+    if 'Dst' in cars[car]:
+      # car has a final destination
+      dst = cars[car]['Dst']
+      if len(dst) == 0:
+        dst = [['','']]
+    return (dst, move)
 
   # find all cars matching the provided partial car_number
   # returns formatted <td> rows 
   #  car_number: string to match car numbers for
   #  limit: maximum number of results requested
-  def GetCarRows(self, car_number, limit):
+  def GetCarRows(self, form, limit):
+    car_number = form['car_number'][0]
     if len(car_number) == 0:
       return []
+
+    switchlist_mode = 'slm' in form and form['slm']=='true'
+    if switchlist_mode and 'sid' in form:
+      switchlist_id = form['sid']
 
     p = re.compile('.*%s.*' % car_number)
     car_rows = []
@@ -224,48 +352,39 @@ class svlHandler(BaseHTTPRequestHandler):
         found = True
         print 'matched ',car
         print 'that is ',cars[car]
-        if 'Move' in cars[car]:
-          # this car is going on a train today.
-          # move is array of dict with schedule info
-          move = cars[car]['Move']
-        else:
-          move = []
         car_number = cars[car]['car_number']
-        if 'Dst' in cars[car]:
-          # car has a final destination
-          dst = cars[car]['Dst']
-          if len(dst) == 0:
-            dst = [['','']]
-        else:
-          dst = [['', '']]
+        (dst, move) = self.GetDstAndMove(car)
+
+        print 'found', dst, move
 
         # build table rows. first car information
         if len(move) > 0:
           car_number = '<b>%s</b>' % car_number
-        car_row = (
-          '<tr bgcolor=dddddd>'
-          '<td colspan=2>%s</td>'
-          '<td colspan=2><font color=999999>%s</font></td>'
-          '</tr>'
-        ) % (
-          car_number,
-          dst[0][0] + ' | ' + dst[0][1],
+            
+        car_row = """
+          <tr bgcolor=dddddd>
+          <td colspan=2 onclick="SLMAddCar('%s')">%s</td>
+          <td colspan=2 onclick="SLMAddCar('%s')"><font color=999999>%s</font></td>
+          </tr>
+        """ % (
+          car, car_number,
+          car, dst[0][0] + ' | ' + dst[0][1],
         )
 
-        # now the train assignments. sort by departure time
-        move.sort(key=lambda m: m['depTime'])		
+        # now the train assignments.
         for m in move:
           car_row += ( 
-            (
-              '<tr><td bgcolor=dddddd>%s</td>'
-              '<td align=right>%s</td>'
-              '<td>%s</td>'
-              '<td> --> %s</td>'
-              '</tr>' 
-            ) % (
-              m['depTime'], m['symbol'],
-              m['startLoc'][0] + ' | ' + m['startLoc'][1],
-              m['endLoc'][0] + ' | ' + m['endLoc'][1],
+            """
+              <tr><td bgcolor=dddddd onclick="SLMAddCar('%s')">%s</td>
+              <td align=right onclick="SLMAddCar('%s')">%s</td>
+              <td onclick="SLMAddCar('%s')">%s</td>
+              <td onclick="SLMAddCar('%s')"> --> %s</td>
+              </tr>
+            """ % (
+              car, m['depTime'], 
+              car, m['symbol'],
+              car, m['startLoc'][0] + ' | ' + m['startLoc'][1],
+              car, m['endLoc'][0] + ' | ' + m['endLoc'][1],
             )
           )
         car_rows.append(car_row)
@@ -294,15 +413,90 @@ class svlHandler(BaseHTTPRequestHandler):
     table += self.GetSessionInfo()
     table += TABLEROWHEADER
     if 'car_number' in form:
-      car_rows = self.GetCarRows(form['car_number'][0], 10)
+      car_rows = self.GetCarRows(form, 20)
       table += ''.join(car_rows)
     table += TABLEFOOTER
     return table
+
+  # returns formatted table with switchlist content
+  def HandleSwitchListPrint(self, form):
+    print 'handling switchlist print'
+    if not 'sid' in form:
+      return 'no switchlist ID given'
+    sid = form['sid'][0]
+    if not sid in switchlists:
+      return 'no switchlist with ID %s' %sid
+
+    table = TABLEHEADER
+    table += self.GetSessionInfo()
+    table += TABLEROWHEADER
+    for car in switchlists[sid]:
+      car_number = cars[car]['car_number']
+      (dst, move) = self.GetDstAndMove(car)
+
+      print 'printing', dst, move
+
+      # build table rows. first car information
+      if len(move) > 0:
+        car_number = '<b>%s</b>' % car_number
+
+      table += """
+        <tr bgcolor=dddddd>
+        <td colspan=2>%s</td>
+        <td colspan=2><font color=999999>%s</font></td>
+        <td><input type=checkbox></td>
+        </tr>
+      """ % (
+        car_number,
+        dst[0][0] + ' | ' + dst[0][1],
+      )
+
+      # now the train assignments.
+      for m in move:
+        table += ( 
+          """
+            <tr><td bgcolor=dddddd>%s</td>
+            <td align=right>%s</td>
+            <td>%s</td>
+            <td> --> %s</td>
+            </tr>
+          """ % (
+            m['depTime'],
+            m['symbol'],
+            m['startLoc'][0] + ' | ' + m['startLoc'][1],
+            m['endLoc'][0] + ' | ' + m['endLoc'][1],
+          )
+        )
+    table += TABLEFOOTER
+    
+    return table
+      
+
+  # called by Javascript code. adds named car to switch list, 
+  # returns current number of cars in switch list
+  def HandleSwitchListAdd(self, form):
+    print 'handling switchlist add'
+    if 'sid' in form and 'car' in form:
+      sid = form['sid'][0]
+      car = form['car'][0]
+      if not sid in switchlists: 
+        switchlists[sid] = []
+      found = False
+      for slc in switchlists[sid]:
+        if slc == car:
+          found = True
+          break
+      if not found:
+        switchlists[sid].append(car)
+      print switchlists[sid]
+      return len(switchlists[sid])
+    return 0
 		
 			
 try:
   # get data
   cars = extract.importXML()
+  extract.importYCRA(cars)
   print cars
   #Create a web server and define the handler to manage the
   #incoming request
