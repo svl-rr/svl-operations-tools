@@ -8,14 +8,46 @@ I fluent in Javascript...
 
 Access would be via port 8000 on the layout computer.
 
-Usage:
-- put SVL post-printing XML database file "SVL_Base_sess_post.xml"
-into same directory as server (or symlink to the actual file)
+Usage
+
 - ./server.py  , logs get printed to stdout
+
+
+Preparation
+
 - go to http://10.0.0.25:8000
-- On the web page, touch type any part of any car number on the
+- click the Upload link
+- upload the Switchster XML file for this session, as well as the
+  respective Yardmaster Car Report for Nowheres
+
+
+User Interface
+
+On the web page, touch type any part of any car number on the
 layout. The table underneath the number pad gets populated with
 matching cars.
 You see where the car is, where it's supposed go, and on which train.
+
+
+Switch List Mode
+
+As an experimental feature one can now create switchlists for a 
+string of cars:
+- enable Switch List Mode (SLM) in lower right corner
+- enter a unique name for the switch list
+- touch type the car numbers to be sorted in order
+- in the table touch the car you are looking up and it gets added
+  to the switch list. The count "N cars" link in the lower right corner
+  will increase.
+- once you have enough cars selected, click the "N cars" link in the lower 
+  right corner.
+- a table with destinations for all selected cars is shown
+
+Caveats:
+- there are some rough edges with Switch List Mode
+- switch lists are kept in memory of server, so server restart will wipe
+  all switch lists
+- switch lists can not be removed or modified at the moment
+
 
 Bernhard
