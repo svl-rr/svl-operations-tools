@@ -52,13 +52,12 @@ function makeHttpObject() {
 }
 function requestResults() {
   var car_number = document.getElementById('car_number').value
-  var switchlist_mode = document.getElementById('switchlist_mode').checked
   var switchlist_id = document.getElementById('switchlist_id').value
   if (car_number == 'undefined') {
     car_number = ''
   }
   var request = makeHttpObject();
-  request.open("GET", "/resultseval?car_number=" + car_number + "&slm=" + switchlist_mode + "&sid=" + switchlist_id, true);
+  request.open("GET", "/resultseval?car_number=" + car_number + "&sid=" + switchlist_id, true);
   request.send(null);
   request.onreadystatechange = function() {
     if (request.readyState == 4) {
@@ -71,24 +70,26 @@ function updateResults(response) {
   document.getElementById('results').innerHTML = response
 }
 function SLMSetId() {
-  var sid = 'fgjh'
-  document.getElementById('switchlist_id').value = sid
-  document.getElementById('switchlist_href').href = '/switchlist_print?sid=' + sid
-  requestResults()
+  var switchlist_id = document.getElementById('switchlist_id').value;
+  if (switchlist_id.length > 0) {
+    document.getElementById('switchlist_href').href = '/switchlist_print?sid=' + switchlist_id;
+    SLMAddCar('')
+    requestResults()
+  }
 }
 function SLMAddCar(car) {
-  var switchlist_mode = document.getElementById('switchlist_mode').checked
-  if (switchlist_mode) {
-    var switchlist_id = document.getElementById('switchlist_id').value
+  var switchlist_id = document.getElementById('switchlist_id').value;
+  if (switchlist_id.length > 0) {
     var request = makeHttpObject();
     request.open("GET", "/switchlist_add?car=" + car + "&sid=" + switchlist_id, true);
     request.send(null);
     request.onreadystatechange = function() {
       if (request.readyState == 4) {
-        if (request.status == 200)
+        if (request.status == 200) {
           SLMUpdateCount(request.responseText);
+        }
       }
-    };
+    }
   }
 }
 function SLMUpdateCount(response) {
@@ -125,12 +126,12 @@ function SLMUpdateCount(response) {
 %(car_rows)s
 %(table_footer)s
 <br><br>
+</form>
 <div align=right>
-SLM:&nbsp;<input type=checkbox name="switchlist_mode" id="switchlist_mode" onchange="SLMSetId()"><br>
-<input type=text name="switchlist_id" id="switchlist_id">
+Switch&nbsp;List:<br>
+<input type=text name="switchlist_id" id="switchlist_id" onchange="SLMSetId()">
 <a href="/switchlist_print" target="slmp" id="switchlist_href"><div id="switchlist_len">0 cars</div></a>
 </div>
-</form>
 </body>
 </html>
 """
@@ -214,6 +215,15 @@ class svlHandler(BaseHTTPRequestHandler):
       self.wfile.write(self.HandleSwitchListPrint(form))
       return
 
+    if self.path.startswith('/switchlist_delete'):
+      # delete switch list
+      self.send_response(200)
+      self.end_headers()
+      form = cgi.parse_qs(self.path[self.path.index('?') + 1:])
+      print 'form',form
+      self.wfile.write(self.HandleSwitchListDelete(form))
+      return
+
 
     # otherwise try serving a static page
     try:
@@ -237,6 +247,11 @@ class svlHandler(BaseHTTPRequestHandler):
       self.send_error(404,'File Not Found: %s' % self.path)
 
   def do_POST(self):
+    if self.path in ['/results', '/']:
+      print 'POST to /results or / . Returning empty template.'
+      self.sendEmptyTemplate()
+      return
+
     form = cgi.FieldStorage(
       fp=self.rfile, 
       headers=self.headers,
@@ -245,6 +260,7 @@ class svlHandler(BaseHTTPRequestHandler):
         'CONTENT_TYPE':self.headers['Content-Type'],
       }
     )
+
     self.send_response(200)
     self.end_headers()
     fields = {}
@@ -336,10 +352,6 @@ class svlHandler(BaseHTTPRequestHandler):
     car_number = form['car_number'][0]
     if len(car_number) == 0:
       return []
-
-    switchlist_mode = 'slm' in form and form['slm']=='true'
-    if switchlist_mode and 'sid' in form:
-      switchlist_id = form['sid']
 
     p = re.compile('.*%s.*' % car_number)
     car_rows = []
@@ -469,27 +481,50 @@ class svlHandler(BaseHTTPRequestHandler):
         )
     table += TABLEFOOTER
     
+    table += """
+      <br>
+      <a href="/switchlist_delete?sid=%s">Delete Switch List</a>
+    """ % sid
+    
     return table
+
+  def HandleSwitchListDelete(self, form):
+    print 'handling switchlist delete'
+    if not 'sid' in form:
+      return 'no switchlist ID given'
+    sid = form['sid'][0]
+    if not sid in switchlists:
+      return 'no switchlist with ID %s' % sid
+
+    del switchlists[sid]
+    return 'switchlist with ID %s deleted' % sid 
+
       
 
   # called by Javascript code. adds named car to switch list, 
   # returns current number of cars in switch list
+  # if submitted car is '' just returns length of switchlist
   def HandleSwitchListAdd(self, form):
     print 'handling switchlist add'
-    if 'sid' in form and 'car' in form:
+    if 'sid' in form:
       sid = form['sid'][0]
-      car = form['car'][0]
-      if not sid in switchlists: 
-        switchlists[sid] = []
-      found = False
-      for slc in switchlists[sid]:
-        if slc == car:
-          found = True
-          break
-      if not found:
-        switchlists[sid].append(car)
-      print switchlists[sid]
-      return len(switchlists[sid])
+      if 'car' in form:
+        car = form['car'][0]
+      else:
+        car = ''
+      if len(car) > 0:
+        if not sid in switchlists: 
+          switchlists[sid] = []
+        found = False
+        for slc in switchlists[sid]:
+          if slc == car:
+            found = True
+            break
+        if not found:
+          switchlists[sid].append(car)
+        print switchlists[sid]
+      if sid in switchlists:
+        return len(switchlists[sid])
     return 0
 		
 			

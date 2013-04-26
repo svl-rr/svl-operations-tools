@@ -194,7 +194,7 @@ def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
     if 'Move' not in cars[carID]:
       cars[carID]['Move'] = []
     cars[carID]['Move'].append(
-        {'symbol': found_cars[carID][2], 'depTime' : '--:--:--',
+        {'symbol': found_cars[carID][2], 'depTime' : '??:??:??',
          'startBlock' : 'Nowheres', 'startLoc' : ['Nowheres', 'Nowheres Yard'],
          'endBlock' : 'Nowheres', 'endLoc' : ['Nowheres', 'assign to ' + found_cars[carID][2]] }
     )

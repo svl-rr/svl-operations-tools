@@ -1,4 +1,5 @@
-Car DB server
+
+Car Server
 
 
 Basic Python HTTP server with some xml parsing into a hash of hashes
@@ -13,15 +14,20 @@ Usage
 - ./server.py  , logs get printed to stdout
 
 
-Preparation
+Preparation by the Trainmaster
 
-- go to http://10.0.0.25:8000
-- click the Upload link
-- upload the Switchster XML file for this session, as well as the
-  respective Yardmaster Car Report for Nowheres
+- Go to http://10.0.0.25:8000
+- Click the Upload link
+- Upload the Switchster XML file for this session, as well as the
+  respective Yardmaster All Car Report for Nowheres (YCR-A-Nowheres Yard.html).
 
 
-User Interface
+Using the Car Server
+
+Visit http://10.0.0.25:8000/ from any web-enabled device connected to 
+the club network (either wireless, or wifi). 
+The Car Server is known to work with Chrome, Firefox, Safari, Android, 
+iPhone, and iPad. It should work with any modern browser software.
 
 On the web page, touch type any part of any car number on the
 layout. The table underneath the number pad gets populated with
@@ -33,21 +39,21 @@ Switch List Mode
 
 As an experimental feature one can now create switchlists for a 
 string of cars:
-- enable Switch List Mode (SLM) in lower right corner
-- enter a unique name for the switch list
-- touch type the car numbers to be sorted in order
-- in the table touch the car you are looking up and it gets added
+- In the lower right corner, enter a unique name for the switch list.
+- Touch type the car numbers to be sorted in order.
+- In the table, touch the car you are looking up and it gets added
   to the switch list. The count "N cars" link in the lower right corner
   will increase.
-- once you have enough cars selected, click the "N cars" link in the lower 
+- Once you have enough cars selected, click the "N cars" link in the lower 
   right corner.
-- a table with destinations for all selected cars is shown
+- A table with destinations for all selected cars is shown.
 
-Caveats:
-- there are some rough edges with Switch List Mode
-- switch lists are kept in memory of server, so server restart will wipe
-  all switch lists
-- switch lists can not be removed or modified at the moment
+
+Caveats
+
+- Switch lists are kept in memory of server. A server restart will wipe
+  all switch lists.
+- Switch lists can not be modified at the moment.
 
 
 Bernhard
