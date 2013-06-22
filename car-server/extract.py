@@ -138,7 +138,13 @@ def importXML(filename='SVL_Base_sess_post.xml'):
 
   return cars
 
-def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
+def importNowheresYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
+  importYCRA(cars, filename, 'Nowheres')
+
+def importBayshoreYCRA(cars, filename='YCR-A-Bayshore Yard.html'):
+  importYCRA(cars, filename, 'Bayshore')
+
+def importYCRA(cars, filename, yardname):
 
   #open the ycra file for reading:
   file = open(filename,'r')
@@ -152,9 +158,9 @@ def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
   # Basic checks:
   # - we actually have a Nowheres YCRA report
   # - session matches session in cars
-  m = re.search('<title>Nowheres Yard Yardmaster Car Report \(All\)</title>', data)
+  m = re.search('<title>%s Yard Yardmaster Car Report \(All\)</title>' % yardname, data)
   if not m:
-    print 'This is not a Nowheres YCRA report'
+    print 'This is not a %s YCRA report' % yardname
     return False
 
   m = re.search('Report for session: (\d+)', data)
@@ -169,7 +175,7 @@ def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
   # parse out all occurences of future train assignments
   # pattern:
   # <tr  BGCOLOR=""><td  align="center"></td><td  align="center">Nowheres&nbsp;Yard</td><td  align="center">ATSF&nbsp;135506</td><td  align="center">XM4</td><td  align="center">Empty</td><td  align="center">Jasper&nbsp;Jct.&nbsp;|&nbsp;Jasper&nbsp;Track&nbsp;#5&nbsp;-&nbsp;Old&nbsp;Junction&nbsp;City&nbsp;(5,6)</td><td  align="center">378|57</td><td  align="center"><input type="checkbox" name="TASK_COMPLETE" value="OFF" /></td></tr>
-  p = '<tr.*<td.*>Nowheres&nbsp;Yard</td><td.*>(.*)</td><td.*/td><td.*/td><td .*>(.*)</td><td.*>(\d+\|\d+)</td><td.*td></tr>'
+  p = '<tr.*<td.*>%s&nbsp;Yard</td><td.*>(.*)</td><td.*/td><td.*/td><td .*>(.*)</td><td.*>(\d+\|\d+)</td><td.*td></tr>' % yardname
   cl = re.findall(p, data)
   future_cars = {}
   for c in cl:
@@ -195,8 +201,8 @@ def importYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
       cars[carID]['Move'] = []
     cars[carID]['Move'].append(
         {'symbol': found_cars[carID][2], 'depTime' : '??:??:??',
-         'startBlock' : 'Nowheres', 'startLoc' : ['Nowheres', 'Nowheres Yard'],
-         'endBlock' : 'Nowheres', 'endLoc' : ['Nowheres', 'assign to ' + found_cars[carID][2]] }
+         'startBlock' : yardname, 'startLoc' : [yardname, yardname + ' Yard'],
+         'endBlock' : yardname, 'endLoc' : [yardname, 'assign to ' + found_cars[carID][2]] }
     )
   return True 
 

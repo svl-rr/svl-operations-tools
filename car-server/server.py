@@ -278,7 +278,7 @@ class svlHandler(BaseHTTPRequestHandler):
 
 
   # handle upload of xml SVL file 
-  # and Nowheres Yardmaster paperwork
+  # and Nowheres/Bayshore Yardmaster paperwork
   def HandleUpload(self, form):
 
     def SaveFile(formfile):
@@ -298,17 +298,28 @@ class svlHandler(BaseHTTPRequestHandler):
 
     xmlfile = form['xmlfile']
     nowheresfile = form['nowheresfile']
+    bayshorefile = form['bayshorefile']
 
     xmlfilename = SaveFile(xmlfile)
     nowheresfilename = SaveFile(nowheresfile)
+    bayshorefilename = SaveFile(bayshorefile)
     if xmlfilename:
       print 'XML upload success'
       new_cars = extract.importXML(xmlfilename)
-      if (not nowheresfilename) or \
-         (nowheresfilename and extract.importYCRA(new_cars, nowheresfilename)):
+      if nowheresfilename and \
+         bayshorefilename and \
+         extract.importNowheresYCRA(new_cars, nowheresfilename) and \
+         extract.importBayshoreYCRA(new_cars, bayshorefilename):
         try:
           os.unlink('SVL_Base_sess_post.xml')
+        except: 
+          pass
+        try:
           os.unlink('YCR-A-Nowheres Yard.html')
+        except:
+          pass
+        try:
+          os.unlink('YCR-A-Bayshore Yard.html')
         except:
           pass
         os.symlink(xmlfilename, 'SVL_Base_sess_post.xml')
@@ -316,6 +327,9 @@ class svlHandler(BaseHTTPRequestHandler):
         if nowheresfilename:
           os.symlink(nowheresfilename, 'YCR-A-Nowheres Yard.html')
           print 'using new Nowheres YCRA'
+        if bayshorefilename:
+          os.symlink(bayshorefilename, 'YCR-A-Bayshore Yard.html')
+          print 'using new Bayshore YCRA'
         cars.update(new_cars)
     
     return {
@@ -531,7 +545,8 @@ class svlHandler(BaseHTTPRequestHandler):
 try:
   # get data
   cars = extract.importXML()
-  extract.importYCRA(cars)
+  extract.importNowheresYCRA(cars)
+  extract.importBayshoreYCRA(cars)
   print cars
   #Create a web server and define the handler to manage the
   #incoming request
