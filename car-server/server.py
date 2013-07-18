@@ -300,37 +300,51 @@ class svlHandler(BaseHTTPRequestHandler):
     nowheresfile = form['nowheresfile']
     bayshorefile = form['bayshorefile']
 
+    data_valid = True
     xmlfilename = SaveFile(xmlfile)
     nowheresfilename = SaveFile(nowheresfile)
     bayshorefilename = SaveFile(bayshorefile)
     if xmlfilename:
       print 'XML upload success'
       new_cars = extract.importXML(xmlfilename)
-      if nowheresfilename and \
-         bayshorefilename and \
-         extract.importNowheresYCRA(new_cars, nowheresfilename) and \
-         extract.importBayshoreYCRA(new_cars, bayshorefilename):
-        try:
-          os.unlink('SVL_Base_sess_post.xml')
-        except: 
-          pass
-        try:
-          os.unlink('YCR-A-Nowheres Yard.html')
-        except:
-          pass
-        try:
-          os.unlink('YCR-A-Bayshore Yard.html')
-        except:
-          pass
-        os.symlink(xmlfilename, 'SVL_Base_sess_post.xml')
-        print 'using new XML file'
-        if nowheresfilename:
-          os.symlink(nowheresfilename, 'YCR-A-Nowheres Yard.html')
-          print 'using new Nowheres YCRA'
-        if bayshorefilename:
-          os.symlink(bayshorefilename, 'YCR-A-Bayshore Yard.html')
-          print 'using new Bayshore YCRA'
-        cars.update(new_cars)
+      if new_cars:
+        print 'XML import success'
+      else:
+        data_valid = False
+    if nowheresfilename:
+      print 'Nowheres upload success'
+      if extract.importNowheresYCRA(new_cars, nowheresfilename):
+        print 'Nowheres import success'
+      else:
+        data_valid = False
+    if bayshorefilename:
+      print 'Bayshore upload success'
+      if extract.importBayshoreYCRA(new_cars, bayshorefilename):
+        print 'Bayshore import success'
+      else:
+        data_valid = False
+    if data_valid:
+      try:
+        os.unlink('SVL_Base_sess_post.xml')
+      except: 
+        pass
+      try:
+        os.unlink('YCR-A-Nowheres Yard.html')
+      except:
+        pass
+      try:
+        os.unlink('YCR-A-Bayshore Yard.html')
+      except:
+        pass
+      os.symlink(xmlfilename, 'SVL_Base_sess_post.xml')
+      print 'using new XML file'
+      if nowheresfilename:
+        os.symlink(nowheresfilename, 'YCR-A-Nowheres Yard.html')
+        print 'using new Nowheres YCRA'
+      if bayshorefilename:
+        os.symlink(bayshorefilename, 'YCR-A-Bayshore Yard.html')
+        print 'using new Bayshore YCRA'
+      cars.update(new_cars)
     
     return {
           'car_number' : '',

@@ -139,10 +139,10 @@ def importXML(filename='SVL_Base_sess_post.xml'):
   return cars
 
 def importNowheresYCRA(cars, filename='YCR-A-Nowheres Yard.html'):
-  importYCRA(cars, filename, 'Nowheres')
+  return importYCRA(cars, filename, 'Nowheres')
 
 def importBayshoreYCRA(cars, filename='YCR-A-Bayshore Yard.html'):
-  importYCRA(cars, filename, 'Bayshore')
+  return importYCRA(cars, filename, 'Bayshore')
 
 def importYCRA(cars, filename, yardname):
 
