@@ -175,6 +175,8 @@ def importYCRA(cars, filename, yardname):
   # parse out all occurences of future train assignments
   # pattern:
   # <tr  BGCOLOR=""><td  align="center"></td><td  align="center">Nowheres&nbsp;Yard</td><td  align="center">ATSF&nbsp;135506</td><td  align="center">XM4</td><td  align="center">Empty</td><td  align="center">Jasper&nbsp;Jct.&nbsp;|&nbsp;Jasper&nbsp;Track&nbsp;#5&nbsp;-&nbsp;Old&nbsp;Junction&nbsp;City&nbsp;(5,6)</td><td  align="center">378|57</td><td  align="center"><input type="checkbox" name="TASK_COMPLETE" value="OFF" /></td></tr>
+  # <tr  BGCOLOR="#98ff00"><td  align="center"></td><td  align="center"><i>Bayshore&nbsp;Yard</i></td><td  align="center"><i>ATSF&nbsp;156270</i></td><td  align="center"><i>XM4</i></td><td  align="center"><i>Empty</i></td><td  align="center"><i>Dayton&nbsp;|&nbsp;Wiebe&nbsp;Wafers</i></td><td  align="center"><i>340|65</i></td><td  align="center"><input type="checkbox" name="TASK_COMPLETE" value="OFF" /></td></tr>
+  data = data.replace('<i>','').replace('</i>','')
   p = '<tr.*<td.*>%s&nbsp;Yard</td><td.*>(.*)</td><td.*/td><td.*/td><td .*>(.*)</td><td.*>(.+?\|\d+)</td><td.*td></tr>' % yardname
   cl = re.findall(p, data)
   future_cars = {}
